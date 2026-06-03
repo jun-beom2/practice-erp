@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>사내 ERP (연습용) — 발주내역조회</title>
+  <link rel="stylesheet" href="./app.css">
+</head>
+<body>
+  <div id="file-warning" class="warn" hidden>
+    ⚠️ 이 페이지는 <b>로컬 서버</b>로 열어야 합니다. (Codex에 "이 폴더에서 로컬 서버 열어줘" 또는 <code>python -m http.server</code>)
+    그래야 [조회]가 데이터를 받아오고 F12 Network에 응답이 보입니다.
+  </div>
+
+  <div class="titlebar">
+    <span class="logo"></span>
+    <span class="sys">사내 ERP</span>
+    <span class="practice">연습용</span>
+    <div class="tabs">
+      <a href="./index.html" class="active">발주내역조회(협력사)</a>
+      <a href="./input.html">납품입력(협력사)</a>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <button id="tb-search">🔍 조회</button>
+    <span class="sep"></span>
+    <span class="tbtn">🖨 인쇄</span>
+    <span class="tbtn">📊 엑셀</span>
+    <span class="tbtn">🧾 거래명세서</span>
+  </div>
+
+  <div class="page">
+    <div class="filter">
+      <label><span class="req">발주일</span>
+        <input type="date" value="2026-06-01"> ~ <input type="date" value="2026-06-03">
+      </label>
+      <label>거래처
+        <select>
+          <option>전체</option><option>가나상사</option><option>다라정밀</option>
+          <option>마바테크</option><option>바사기계</option>
+        </select>
+      </label>
+      <label>품번 <input type="text" placeholder="예: P-1001"></label>
+      <button class="btn-search" id="ft-search">조회</button>
+    </div>
+
+    <div class="notice">
+      ※ 연습용 화면입니다. 거래처·품번·단가·수량은 모두 <b>가상 데이터</b>입니다 (실제 회사 데이터 아님).<br>
+      ※ [조회]를 누르면 서버에서 발주 목록을 받아옵니다 — <b>F12 → Network(네트워크) → <code>orders.json</code> → Response(응답)</b>.
+    </div>
+
+    <div id="result" hidden>
+      <div class="grid-wrap">
+        <table class="grid">
+          <thead>
+            <tr>
+              <th>No</th><th>발주번호</th><th>거래처</th><th>품번</th><th>품명</th><th>규격</th>
+              <th>재질</th><th>단위</th><th>발주수량</th><th>단가</th><th>금액</th><th>창고</th><th>납기</th><th>상태</th><th>납품</th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <div class="gridfoot"><span id="count"></span><span id="updated"></span></div>
+    </div>
+
+    <div id="status" class="notice" style="color:#374151"></div>
+  </div>
+
+  <script>
+    if (location.protocol === 'file:') document.getElementById('file-warning').hidden = false;
+
+    function won(n) { return Number(n).toLocaleString('ko-KR'); }
+
+    async function load() {
+      var status = document.getElementById('status');
+      status.textContent = '불러오는 중…';
+      try {
+        // [조회] = 응답을 주는 주소를 부르는 것. 프록시(심부름꾼)도 이 주소로 가져옵니다.
+        var res = await fetch('./api/orders.json', { cache: 'no-store' });
+        var data = await res.json();
+        var tbody = document.getElementById('rows');
+        tbody.innerHTML = '';
+        data.orders.forEach(function (o, i) {
+          var tr = document.createElement('tr');
+          tr.innerHTML =
+            '<td class="ctr">' + (i + 1) + '</td>' +
+            '<td>' + o.발주번호 + '</td>' +
+            '<td>' + o.거래처 + '</td>' +
+            '<td>' + o.품번 + '</td>' +
+            '<td>' + o.품명 + '</td>' +
+            '<td>' + o.규격 + '</td>' +
+            '<td class="ctr">' + o.재질 + '</td>' +
+            '<td class="ctr">' + o.단위 + '</td>' +
+            '<td class="num">' + won(o.발주수량) + '</td>' +
+            '<td class="num">' + won(o.단가) + '</td>' +
+            '<td class="num">' + won(o.금액) + '</td>' +
+            '<td class="ctr">' + o.창고 + '</td>' +
+            '<td class="ctr">' + o.납기 + '</td>' +
+            '<td class="ctr"><span class="status-pill s-' + o.상태 + '">' + o.상태 + '</span></td>' +
+            '<td class="ctr"><a class="btn-search" style="padding:3px 10px;font-size:11px;text-decoration:none" href="./input.html?po=' + encodeURIComponent(o.발주번호) + '">납품입력</a></td>';
+          tbody.appendChild(tr);
+        });
+        document.getElementById('result').hidden = false;
+        document.getElementById('count').textContent = '총 ' + data.orders.length + '건';
+        document.getElementById('updated').textContent = '갱신: ' + new Date().toLocaleTimeString('ko-KR');
+        status.textContent = '';
+      } catch (e) {
+        status.textContent = '불러오기 실패 — 로컬 서버로 열었는지 확인하세요.';
+      }
+    }
+
+    document.getElementById('tb-search').addEventListener('click', load);
+    document.getElementById('ft-search').addEventListener('click', load);
+  </script>
+</body>
+</html>

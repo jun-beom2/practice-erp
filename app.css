@@ -1,0 +1,72 @@
+/* 연습용 ERP — 사내 ERP 복제본 느낌 (네이비 탭바 + 녹색 그리드, 전부 더미 데이터) */
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  font-family: "Pretendard Variable", Pretendard, system-ui, "Malgun Gothic", sans-serif;
+  color: #1f2937; background: #eef1f4; font-size: 13px;
+}
+
+/* file:// 경고 */
+.warn { background: #FEF3C7; border-bottom: 1px solid #FCD34D; color: #92400E; padding: 8px 14px; font-size: 13px; line-height: 1.6; }
+.warn code { background: #FDE68A; padding: 1px 5px; border-radius: 4px; }
+
+/* 상단 탭바 (네이비) */
+.titlebar { display: flex; align-items: center; gap: 10px; background: #1f2d3d; color: #cbd5e1; padding: 0 12px; height: 40px; }
+.titlebar .logo { width: 18px; height: 18px; background: #16a34a; border-radius: 4px; display: inline-block; }
+.titlebar .sys { color: #fff; font-weight: 700; font-size: 14px; }
+.titlebar .practice { background: #ef4444; color: #fff; font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 999px; }
+.tabs { display: flex; align-items: flex-end; gap: 2px; margin-left: 8px; height: 40px; }
+.tabs a { display: flex; align-items: center; height: 30px; align-self: flex-end; padding: 0 16px; font-size: 12.5px; color: #94a3b8; text-decoration: none; background: #2b3a4d; border-radius: 6px 6px 0 0; }
+.tabs a.active { background: #fff; color: #1f2d3d; font-weight: 700; }
+
+/* 툴바 */
+.toolbar { display: flex; align-items: center; gap: 4px; background: #f1f3f5; border-bottom: 1px solid #d9dee3; padding: 6px 10px; }
+.toolbar button, .toolbar .tbtn {
+  display: inline-flex; align-items: center; gap: 5px; background: #fff; border: 1px solid #cdd4db;
+  border-radius: 5px; padding: 5px 11px; font-size: 12.5px; color: #374151; cursor: pointer;
+}
+.toolbar .tbtn { color: #9aa3ad; cursor: default; }
+.toolbar button:hover { background: #eef6f1; border-color: #16a34a; color: #15803d; }
+.toolbar .sep { width: 1px; height: 18px; background: #d9dee3; margin: 0 4px; }
+
+/* 본문 */
+.page { padding: 12px; }
+
+/* 조회 필터 */
+.filter { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; background: #fff; border: 1px solid #e2e6ea; border-radius: 6px; padding: 11px 14px; }
+.filter label { font-size: 12.5px; color: #374151; display: inline-flex; align-items: center; gap: 6px; }
+.filter .req { color: #d92d20; font-weight: 600; }
+.filter input, .filter select { border: 1px solid #cdd4db; border-radius: 5px; padding: 5px 8px; font-size: 12.5px; }
+.btn-search { background: #16a34a; color: #fff; border: 0; border-radius: 5px; padding: 7px 18px; font-weight: 700; font-size: 13px; cursor: pointer; }
+.btn-search:hover { background: #15803d; }
+
+.notice { color: #d92d20; font-size: 12px; margin: 11px 2px 7px; line-height: 1.7; }
+.notice code { color: #374151; background: #f3f4f6; padding: 1px 5px; border-radius: 4px; }
+
+/* 그리드 */
+.grid-wrap { overflow-x: auto; border: 1px solid #d9dee3; border-radius: 6px; background: #fff; }
+table.grid { border-collapse: collapse; width: 100%; font-size: 12.5px; white-space: nowrap; }
+table.grid th { background: #2f7d57; color: #fff; font-weight: 600; padding: 8px 11px; text-align: center; border-right: 1px solid #2a6f4d; }
+table.grid td { padding: 7px 11px; border-bottom: 1px solid #eef1f4; border-right: 1px solid #f3f5f7; }
+table.grid tr:hover td { background: #f0fdf4; }
+table.grid td.num { text-align: right; font-variant-numeric: tabular-nums; }
+table.grid td.ctr { text-align: center; }
+.status-pill { font-size: 11px; padding: 1px 9px; border-radius: 999px; }
+.s-미납품 { background: #fef2f2; color: #b91c1c; }
+.s-부분납품 { background: #fffbeb; color: #b45309; }
+.s-납품완료 { background: #ecfdf5; color: #047857; }
+
+.gridfoot { display: flex; justify-content: space-between; color: #6b7280; font-size: 12px; padding: 7px 4px; }
+
+/* 납품입력 헤더 폼 */
+.formcard { background: #fff; border: 1px solid #e2e6ea; border-radius: 6px; padding: 14px 16px; }
+.formgrid { display: grid; grid-template-columns: 96px 1fr 96px 1fr; gap: 10px 14px; align-items: center; }
+.formgrid label { font-size: 12.5px; color: #374151; }
+.formgrid label.req { color: #d92d20; font-weight: 600; }
+.formgrid input, .formgrid select, .formgrid textarea { border: 1px solid #cdd4db; border-radius: 5px; padding: 6px 9px; font-size: 12.5px; width: 100%; font-family: inherit; }
+.formgrid .full { grid-column: 2 / 5; }
+.summary { display: flex; gap: 28px; background: #f8fafc; border: 1px solid #e2e6ea; border-radius: 6px; padding: 11px 18px; margin-top: 12px; }
+.summary div b { color: #6b7280; font-weight: 600; font-size: 12px; margin-right: 10px; }
+.summary div span { font-variant-numeric: tabular-nums; font-weight: 700; font-size: 14px; }
+input.qty { border: 1.5px solid #16a34a; width: 90px; padding: 5px 8px; border-radius: 5px; text-align: right; font-size: 12.5px; }
+.saved { margin-top: 12px; font-size: 13px; line-height: 1.7; }

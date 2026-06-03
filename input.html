@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>사내 ERP (연습용) — 납품입력</title>
+  <link rel="stylesheet" href="./app.css">
+</head>
+<body>
+  <div id="file-warning" class="warn" hidden>
+    ⚠️ 이 페이지는 <b>로컬 서버</b>로 열어야 합니다. (Codex에 "이 폴더에서 로컬 서버 열어줘" 또는 <code>python -m http.server</code>)
+  </div>
+
+  <div class="titlebar">
+    <span class="logo"></span>
+    <span class="sys">사내 ERP</span>
+    <span class="practice">연습용</span>
+    <div class="tabs">
+      <a href="./index.html">발주내역조회(협력사)</a>
+      <a href="./input.html" class="active">납품입력(협력사)</a>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <span class="tbtn">🆕 신규</span>
+    <span class="tbtn">🔍 조회</span>
+    <span class="sep"></span>
+    <button id="tb-save">💾 저장</button>
+    <span class="tbtn">🗑 행삭제</span>
+    <span class="sep"></span>
+    <span class="tbtn">🧾 거래명세서(구매)</span>
+  </div>
+
+  <div class="page">
+    <div class="formcard">
+      <div class="formgrid">
+        <label class="req">납품일</label><input type="date" value="2026-06-03">
+        <label>납품번호</label><input type="text" placeholder="(저장 시 자동 채번)">
+        <label class="req">구매거래처</label><input id="vendor" type="text" readonly>
+        <label>내외자구분</label><select><option>내수</option><option>외자</option></select>
+        <label class="req">통화</label><input type="text" value="KRW" style="width:90px">
+        <label>환율</label><input type="text" value="1.00" style="width:90px">
+        <label>특이사항</label><textarea class="full" rows="2" placeholder="(연습용)"></textarea>
+      </div>
+      <div class="summary">
+        <div><b>금액계</b><span id="sum1">0</span></div>
+        <div><b>부가세계</b><span id="sum2">0</span></div>
+        <div><b>금액총계</b><span id="sum3">0</span></div>
+      </div>
+    </div>
+
+    <div class="notice">
+      ※ 연습용 — 가상 데이터. 자동화는 <b>납품수량</b>을 채우고 <b>저장 직전에서 멈춥니다.</b>
+      (연습용이라 저장을 실제로 눌러봐도 안전합니다.)
+    </div>
+
+    <div class="grid-wrap" style="margin-top:6px">
+      <table class="grid">
+        <thead>
+          <tr>
+            <th>선택</th><th>품명</th><th>품번</th><th>규격</th><th>단위</th>
+            <th>발주수량</th><th>납품수량</th><th>단가</th><th>금액</th><th>부가세율</th><th>창고</th><th>비고</th>
+          </tr>
+        </thead>
+        <tbody id="rows"><tr><td colspan="12" class="ctr" style="color:#9aa3ad;padding:18px">발주를 불러오는 중…</td></tr></tbody>
+      </table>
+    </div>
+
+    <div id="saved" class="saved"></div>
+  </div>
+
+  <script>
+    if (location.protocol === 'file:') document.getElementById('file-warning').hidden = false;
+
+    function won(n) { return Number(n).toLocaleString('ko-KR'); }
+    var po = new URLSearchParams(location.search).get('po');
+    var current = null;
+
+    (async function () {
+      try {
+        var res = await fetch('./api/orders.json', { cache: 'no-store' });
+        var data = await res.json();
+        var o = data.orders.find(function (x) { return x.발주번호 === po; }) || data.orders[0];
+        current = o;
+        document.getElementById('vendor').value = o.거래처;
+        document.getElementById('rows').innerHTML =
+          '<tr>' +
+          '<td class="ctr"><input type="checkbox"></td>' +
+          '<td>' + o.품명 + '</td>' +
+          '<td>' + o.품번 + '</td>' +
+          '<td>' + o.규격 + '</td>' +
+          '<td class="ctr">' + o.단위 + '</td>' +
+          '<td class="num">' + won(o.발주수량) + '</td>' +
+          '<td class="ctr"><input id="qty" class="qty" type="number" min="0" placeholder="0"></td>' +
+          '<td class="num">' + won(o.단가) + '</td>' +
+          '<td class="num" id="lineAmt">0</td>' +
+          '<td class="ctr">10.0%</td>' +
+          '<td class="ctr">' + o.창고 + '</td>' +
+          '<td><input type="text" style="width:120px;border:1px solid #cdd4db;border-radius:5px;padding:4px 6px"></td>' +
+          '</tr>';
+        document.getElementById('qty').addEventListener('input', recalc);
+      } catch (e) {
+        document.getElementById('rows').innerHTML =
+          '<tr><td colspan="12" class="ctr" style="color:#b91c1c;padding:18px">발주를 불러오지 못했습니다 — 로컬 서버로 열었는지 확인하세요.</td></tr>';
+      }
+    })();
+
+    function recalc() {
+      if (!current) return;
+      var qty = Number(document.getElementById('qty').value) || 0;
+      var amt = qty * current.단가;
+      var vat = Math.round(amt * 0.1);
+      document.getElementById('lineAmt').textContent = won(amt);
+      document.getElementById('sum1').textContent = won(amt);
+      document.getElementById('sum2').textContent = won(vat);
+      document.getElementById('sum3').textContent = won(amt + vat);
+    }
+
+    document.getElementById('tb-save').addEventListener('click', function () {
+      var qtyEl = document.getElementById('qty');
+      var saved = document.getElementById('saved');
+      if (!qtyEl || !qtyEl.value) { saved.innerHTML = '<span style="color:#b91c1c">납품수량을 입력하세요.</span>'; return; }
+      // 연습용이라 저장을 눌러도 안전 — 메시지로 '저장 직전 멈춤' 원칙을 상기
+      saved.innerHTML =
+        '✅ 저장되었습니다 (연습용). 납품수량 <b>' + qtyEl.value + '</b>.<br>' +
+        '<span style="color:#6b7280;font-size:12.5px;">진짜 ERP에서는 자동화가 여기 \'저장\' 직전에서 <b>멈추고</b>, 사람이 확인 후 누릅니다.</span>';
+    });
+  </script>
+</body>
+</html>
