@@ -8,7 +8,6 @@ import json
 import os
 import re
 import sys
-import time
 import traceback
 
 from playwright.sync_api import sync_playwright
@@ -165,7 +164,31 @@ def main() -> int:
                 except Exception:
                     write({"kind": "recorder_error", "where": "on_action", "error": traceback.format_exc()})
 
+            def on_browser_network(source, payload):
+                try:
+                    payload = dict(payload)
+                    event = {
+                        "kind": payload.get("kind", "browser_network"),
+                        "pageUrl": payload.get("pageUrl"),
+                        "source": "browser_hook",
+                    }
+                    for key in ("method", "status", "resourceType", "contentType", "durationMs", "error"):
+                        if key in payload:
+                            event[key] = payload[key]
+                    if payload.get("url"):
+                        event["url"] = mask_url(str(payload["url"]))
+                    if isinstance(payload.get("headers"), dict):
+                        event["headers"] = mask_headers(payload["headers"])
+                    if "postData" in payload:
+                        event["postData"] = mask_text(payload.get("postData"))
+                    if "body" in payload:
+                        event["body"] = mask_text(payload.get("body"))
+                    write(event)
+                except Exception:
+                    write({"kind": "recorder_error", "where": "on_browser_network", "error": traceback.format_exc()})
+
             context.expose_binding("pwNetworkRecorderAction", on_action)
+            context.expose_binding("pwNetworkRecorderNetwork", on_browser_network)
             context.add_init_script(
                 r"""
 (() => {
@@ -204,6 +227,123 @@ def main() -> int:
     payload.valueRecorded = false;
     if (window.pwNetworkRecorderAction) window.pwNetworkRecorderAction(payload).catch(() => {});
   }, true);
+
+  if (window.__pw_network_recorder_installed) return;
+  window.__pw_network_recorder_installed = true;
+
+  const sendNetwork = payload => {
+    payload.pageUrl = location.href;
+    if (window.pwNetworkRecorderNetwork) window.pwNetworkRecorderNetwork(payload).catch(() => {});
+  };
+  const headersObject = headers => {
+    const out = {};
+    if (!headers) return out;
+    try {
+      new Headers(headers).forEach((value, key) => { out[key] = value; });
+    } catch (_) {}
+    return out;
+  };
+  const bodyText = async body => {
+    if (body == null) return null;
+    if (typeof body === 'string') return body;
+    if (body instanceof URLSearchParams) return body.toString();
+    if (body instanceof FormData) {
+      const fields = {};
+      body.forEach((value, key) => { fields[key] = value && value.name ? `[File:${value.name}]` : String(value); });
+      return JSON.stringify(fields);
+    }
+    if (body instanceof Blob) return `[Blob:${body.type || 'application/octet-stream'}:${body.size}]`;
+    if (body instanceof ArrayBuffer) return `[ArrayBuffer:${body.byteLength}]`;
+    if (ArrayBuffer.isView(body)) return `[ArrayBufferView:${body.byteLength}]`;
+    try { return JSON.stringify(body); } catch (_) { return String(body); }
+  };
+  const responseText = async response => {
+    const contentType = response.headers.get('content-type') || '';
+    if (!/(json|text|xml|html|javascript|x-www-form-urlencoded)/i.test(contentType)) return null;
+    try { return await response.clone().text(); } catch (_) { return null; }
+  };
+
+  const originalFetch = window.fetch;
+  if (originalFetch) {
+    window.fetch = async function(input, init) {
+      const started = Date.now();
+      let request = null;
+      let postData = null;
+      try {
+        request = new Request(input, init);
+        postData = await request.clone().text();
+      } catch (_) {}
+      const method = request ? request.method : ((init && init.method) || 'GET');
+      const url = request ? request.url : String(input);
+      const headers = request ? headersObject(request.headers) : headersObject(init && init.headers);
+      sendNetwork({kind: 'browser_request', resourceType: 'fetch', method, url, headers, postData});
+      try {
+        const response = await originalFetch.call(this, request || input, request ? undefined : init);
+        const responsePayload = {
+          kind: 'browser_response',
+          resourceType: 'fetch',
+          method,
+          url: response.url || url,
+          status: response.status,
+          contentType: response.headers.get('content-type') || '',
+          headers: headersObject(response.headers),
+          durationMs: Date.now() - started
+        };
+        sendNetwork(responsePayload);
+        return response;
+      } catch (error) {
+        sendNetwork({
+          kind: 'browser_response',
+          resourceType: 'fetch',
+          method,
+          url,
+          error: error && error.message ? error.message : String(error),
+          durationMs: Date.now() - started
+        });
+        throw error;
+      }
+    };
+  }
+
+  const OriginalXHR = window.XMLHttpRequest;
+  if (OriginalXHR) {
+    const originalOpen = OriginalXHR.prototype.open;
+    const originalSend = OriginalXHR.prototype.send;
+    const originalSetRequestHeader = OriginalXHR.prototype.setRequestHeader;
+    OriginalXHR.prototype.open = function(method, url) {
+      this.__pwrec = {method: method || 'GET', url: new URL(url, location.href).href, headers: {}, started: 0};
+      return originalOpen.apply(this, arguments);
+    };
+    OriginalXHR.prototype.setRequestHeader = function(name, value) {
+      if (this.__pwrec) this.__pwrec.headers[String(name).toLowerCase()] = String(value);
+      return originalSetRequestHeader.apply(this, arguments);
+    };
+    OriginalXHR.prototype.send = function(body) {
+      const rec = this.__pwrec || {method: 'GET', url: '', headers: {}};
+      rec.started = Date.now();
+      bodyText(body).then(postData => {
+        sendNetwork({kind: 'browser_request', resourceType: 'xhr', method: rec.method, url: rec.url, headers: rec.headers, postData});
+      });
+      this.addEventListener('loadend', () => {
+        const contentType = this.getResponseHeader('content-type') || '';
+        let body = null;
+        if (!this.responseType || this.responseType === 'text') {
+          try { body = this.responseText; } catch (_) {}
+        }
+        sendNetwork({
+          kind: 'browser_response',
+          resourceType: 'xhr',
+          method: rec.method,
+          url: this.responseURL || rec.url,
+          status: this.status,
+          contentType,
+          body,
+          durationMs: rec.started ? Date.now() - rec.started : null
+        });
+      });
+      return originalSend.apply(this, arguments);
+    };
+  }
 })();
 """
             )
@@ -235,14 +375,10 @@ def main() -> int:
                     "contentType": content_type,
                     "headers": mask_headers(res.headers),
                 }
-                should_store_body = req.resource_type in ("xhr", "fetch") or args.include_document_body
-                if should_store_body and TEXT_CT_RE.search(content_type):
-                    try:
-                        event["body"] = mask_text(res.text())
-                    except Exception as exc:
-                        event["bodyError"] = str(exc)
+                if req.resource_type == "document":
+                    event["bodyOmitted"] = "document body omitted"
                 else:
-                    event["bodyOmitted"] = "document body omitted" if req.resource_type == "document" else "non-text content-type"
+                    event["bodyOmitted"] = "response body omitted to keep browser fetch non-blocking"
                 write(event)
 
             context.on("request", on_request)
@@ -267,7 +403,7 @@ def main() -> int:
 
             try:
                 while True:
-                    time.sleep(1)
+                    page.wait_for_timeout(1000)
             except KeyboardInterrupt:
                 write({"kind": "recorder_stopped"})
             finally:
