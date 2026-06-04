@@ -121,8 +121,6 @@
       var qtyEl = document.getElementById('qty');
       var saved = document.getElementById('saved');
       if (!qtyEl || !qtyEl.value) { saved.innerHTML = '<span style="color:#b91c1c">납품수량을 입력하세요.</span>'; return; }
-      if (!confirm('연습 ERP에서만 더미 저장 요청을 보냅니다. 진짜 ERP에서는 저장 직전에서 멈춥니다. 계속할까요?')) return;
-
       try {
         var payload = {
           발주번호: current.발주번호,
