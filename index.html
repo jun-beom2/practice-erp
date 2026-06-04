@@ -56,7 +56,7 @@
           <thead>
             <tr>
               <th>No</th><th>발주번호</th><th>거래처</th><th>품번</th><th>품명</th><th>규격</th>
-              <th>재질</th><th>단위</th><th>발주수량</th><th>단가</th><th>금액</th><th>창고</th><th>납기</th><th>상태</th><th>납품</th>
+              <th>재질</th><th>단위</th><th>발주수량</th><th>납품수량</th><th>잔량</th><th>단가</th><th>금액</th><th>창고</th><th>납기</th><th>상태</th><th>납품</th>
             </tr>
           </thead>
           <tbody id="rows"></tbody>
@@ -87,6 +87,7 @@
         document.getElementById('count').textContent = '총 ' + orders.length + '건';
         document.getElementById('updated').textContent = '갱신: ' + new Date().toLocaleTimeString('ko-KR');
         status.textContent = '';
+        sessionStorage.setItem('ordersSearched', '1');
       } catch (e) {
         status.textContent = '불러오기 실패 — python proxy_server.py로 열었는지 확인하세요.';
       }
@@ -106,7 +107,7 @@
       var tbody = document.getElementById('rows');
       tbody.innerHTML = '';
       if (orders.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="15" class="ctr" style="color:#9aa3ad;padding:18px">조건에 맞는 발주가 없습니다.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="17" class="ctr" style="color:#9aa3ad;padding:18px">조건에 맞는 발주가 없습니다.</td></tr>';
         return;
       }
       orders.forEach(function (o, i) {
@@ -121,6 +122,8 @@
           '<td class="ctr">' + o.재질 + '</td>' +
           '<td class="ctr">' + o.단위 + '</td>' +
           '<td class="num">' + won(o.발주수량) + '</td>' +
+          '<td class="num">' + won(o.납품수량) + '</td>' +
+          '<td class="num">' + won(o.잔량) + '</td>' +
           '<td class="num">' + won(o.단가) + '</td>' +
           '<td class="num">' + won(o.금액) + '</td>' +
           '<td class="ctr">' + o.창고 + '</td>' +
@@ -133,6 +136,7 @@
 
     document.getElementById('tb-search').addEventListener('click', load);
     document.getElementById('ft-search').addEventListener('click', load);
+    if (sessionStorage.getItem('ordersSearched') === '1') load();
   </script>
 </body>
 </html>

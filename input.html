@@ -138,9 +138,11 @@
         });
         var data = await res.json();
         if (!data.ok) throw new Error(data.error || 'save failed');
+        sessionStorage.setItem('ordersSearched', '1');
 
         saved.innerHTML =
-          '✅ 연습용 저장 요청을 보냈습니다. F12 Network에서 <b>api/deliveries</b>의 Payload를 확인하세요.<br>' +
+          '✅ 연습용 저장 요청을 보냈습니다. 발주내역조회로 돌아가면 납품수량과 상태가 반영됩니다.<br>' +
+          '<span style="color:#6b7280;font-size:12.5px;">F12 Network에서 <b>api/deliveries</b>의 Payload도 확인할 수 있습니다.</span><br>' +
           '<span style="color:#6b7280;font-size:12.5px;">진짜 ERP에서는 자동화가 여기 \'저장\' 직전에서 <b>멈추고</b>, 사람이 확인 후 누릅니다.</span>';
       } catch (e) {
         saved.innerHTML = '<span style="color:#b91c1c">저장 요청 실패 — python proxy_server.py로 열었는지 확인하세요.</span>';

@@ -20,7 +20,7 @@ class PracticeERPHandler(SimpleHTTPRequestHandler):
     def do_GET(self):
         path = urlparse(self.path).path
         if path == "/proxy/orders":
-            self._send_json(json.loads(ORDERS_PATH.read_text(encoding="utf-8")))
+            self._send_json(self._orders_with_deliveries())
             return
         super().do_GET()
 
@@ -43,12 +43,39 @@ class PracticeERPHandler(SimpleHTTPRequestHandler):
             self._send_json({"ok": False, "error": "invalid_qty"}, status=400)
             return
 
+        po = payload.get("발주번호")
+        orders = {o["발주번호"]: o for o in self._base_orders()["orders"]}
+        if po not in orders:
+            self._send_json({"ok": False, "error": "unknown_order"}, status=404)
+            return
+
+        current = self.server.deliveries.get(po, 0)
+        ordered_qty = orders[po]["발주수량"]
+        self.server.deliveries[po] = min(current + qty, ordered_qty)
+
         self._send_json({
             "ok": True,
             "message": "practice_delivery_received",
-            "persisted": False,
+            "persisted": True,
             "received": payload,
+            "납품누계": self.server.deliveries[po],
         })
+
+    def _base_orders(self):
+        return json.loads(ORDERS_PATH.read_text(encoding="utf-8"))
+
+    def _orders_with_deliveries(self):
+        payload = self._base_orders()
+        for order in payload["orders"]:
+            delivered = self.server.deliveries.get(order["발주번호"], 0)
+            ordered = order["발주수량"]
+            order["납품수량"] = delivered
+            order["잔량"] = max(ordered - delivered, 0)
+            if delivered >= ordered:
+                order["상태"] = "납품완료"
+            elif delivered > 0:
+                order["상태"] = "부분납품"
+        return payload
 
     def _send_json(self, payload, status=200):
         raw = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
@@ -60,7 +87,9 @@ class PracticeERPHandler(SimpleHTTPRequestHandler):
 
 
 def make_server(host="127.0.0.1", port=8000):
-    return ThreadingHTTPServer((host, port), PracticeERPHandler)
+    server = ThreadingHTTPServer((host, port), PracticeERPHandler)
+    server.deliveries = {}
+    return server
 
 
 def main():
