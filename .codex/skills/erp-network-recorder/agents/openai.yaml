@@ -1,0 +1,4 @@
+interface:
+  display_name: "ERP Network Recorder"
+  short_description: "Record ERP UI and Network flows."
+  default_prompt: "ERP Network Recorder로 기록모드 Playwright 창을 띄워줘."

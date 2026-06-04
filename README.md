@@ -48,9 +48,10 @@ F12 Network에 프록시 응답과 저장 요청이 보이려면 **프록시 서
 DevTools를 직접 열지 않아도 Playwright 기록모드 창에서 조작하면 UI 클릭과 Network 요청/응답을 JSONL로 저장할 수 있습니다.
 
 ```powershell
-python tools/erp_network_recorder.py --url http://58.72.235.17:8100/
+python .codex\skills\erp-network-recorder\scripts\erp_network_recorder.py --url http://58.72.235.17:8100/
 ```
 
+- 같은 스크립트는 `tools/erp_network_recorder.py`에도 있어 직접 실행할 수 있습니다.
 - 오른쪽 위에 `REC Playwright Network` 배지가 보이는 창에서만 조작합니다.
 - 로그인, 메뉴 이동, 조회 실행 후 로그 파일을 분석하면 어떤 동작이 어떤 `WebApi` 요청을 만들었는지 확인할 수 있습니다.
 - 로그와 브라우저 프로필은 `output/playwright/`에 생성되며 git에는 포함하지 않습니다.
