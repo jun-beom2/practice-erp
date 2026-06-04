@@ -8,8 +8,8 @@
 </head>
 <body>
   <div id="file-warning" class="warn" hidden>
-    ⚠️ 이 페이지는 <b>로컬 서버</b>로 열어야 합니다. (Codex에 "이 폴더에서 로컬 서버 열어줘" 또는 <code>python -m http.server</code>)
-    그래야 [조회]가 데이터를 받아오고 F12 Network에 응답이 보입니다.
+    ⚠️ 이 페이지는 <b>프록시 서버</b>로 열어야 합니다. (Codex에 "이 폴더에서 프록시 서버 열어줘" 또는 <code>python proxy_server.py</code>)
+    그래야 [조회]가 프록시 응답을 받아오고 F12 Network에 응답이 보입니다.
   </div>
 
   <div class="titlebar">
@@ -23,7 +23,7 @@
   </div>
 
   <div class="toolbar">
-    <button id="tb-search">🔍 조회</button>
+    <button id="tb-search" data-testid="search-button">🔍 조회</button>
     <span class="sep"></span>
     <span class="tbtn">🖨 인쇄</span>
     <span class="tbtn">📊 엑셀</span>
@@ -33,21 +33,21 @@
   <div class="page">
     <div class="filter">
       <label><span class="req">발주일</span>
-        <input type="date" value="2026-06-01"> ~ <input type="date" value="2026-06-03">
+        <input id="start-date" data-testid="start-date" type="date" value="2026-06-01"> ~ <input id="end-date" data-testid="end-date" type="date" value="2026-06-03">
       </label>
       <label>거래처
-        <select>
+        <select id="vendor-filter" data-testid="vendor-filter">
           <option>전체</option><option>가나상사</option><option>다라정밀</option>
           <option>마바테크</option><option>바사기계</option>
         </select>
       </label>
-      <label>품번 <input type="text" placeholder="예: P-1001"></label>
-      <button class="btn-search" id="ft-search">조회</button>
+      <label>품번 <input id="part-filter" data-testid="part-filter" type="text" placeholder="예: P-1001"></label>
+      <button class="btn-search" id="ft-search" data-testid="filter-search-button">조회</button>
     </div>
 
     <div class="notice">
       ※ 연습용 화면입니다. 거래처·품번·단가·수량은 모두 <b>가상 데이터</b>입니다 (실제 회사 데이터 아님).<br>
-      ※ [조회]를 누르면 서버에서 발주 목록을 받아옵니다 — <b>F12 → Network(네트워크) → <code>orders.json</code> → Response(응답)</b>.
+      ※ [조회]를 누르면 프록시가 발주 목록을 대신 받아옵니다 — <b>F12 → Network(네트워크) → <code>proxy/orders</code> → Response(응답)</b>.
     </div>
 
     <div id="result" hidden>
@@ -77,38 +77,58 @@
       var status = document.getElementById('status');
       status.textContent = '불러오는 중…';
       try {
-        // [조회] = 응답을 주는 주소를 부르는 것. 프록시(심부름꾼)도 이 주소로 가져옵니다.
-        var res = await fetch('./api/orders.json', { cache: 'no-store' });
+        // [조회] = 프록시(심부름꾼)가 ERP 응답을 대신 가져오는 것.
+        var res = await fetch('./proxy/orders', { cache: 'no-store' });
+        if (!res.ok) throw new Error('proxy failed');
         var data = await res.json();
-        var tbody = document.getElementById('rows');
-        tbody.innerHTML = '';
-        data.orders.forEach(function (o, i) {
-          var tr = document.createElement('tr');
-          tr.innerHTML =
-            '<td class="ctr">' + (i + 1) + '</td>' +
-            '<td>' + o.발주번호 + '</td>' +
-            '<td>' + o.거래처 + '</td>' +
-            '<td>' + o.품번 + '</td>' +
-            '<td>' + o.품명 + '</td>' +
-            '<td>' + o.규격 + '</td>' +
-            '<td class="ctr">' + o.재질 + '</td>' +
-            '<td class="ctr">' + o.단위 + '</td>' +
-            '<td class="num">' + won(o.발주수량) + '</td>' +
-            '<td class="num">' + won(o.단가) + '</td>' +
-            '<td class="num">' + won(o.금액) + '</td>' +
-            '<td class="ctr">' + o.창고 + '</td>' +
-            '<td class="ctr">' + o.납기 + '</td>' +
-            '<td class="ctr"><span class="status-pill s-' + o.상태 + '">' + o.상태 + '</span></td>' +
-            '<td class="ctr"><a class="btn-search" style="padding:3px 10px;font-size:11px;text-decoration:none" href="./input.html?po=' + encodeURIComponent(o.발주번호) + '">납품입력</a></td>';
-          tbody.appendChild(tr);
-        });
+        var orders = applyFilters(data.orders);
+        renderRows(orders);
         document.getElementById('result').hidden = false;
-        document.getElementById('count').textContent = '총 ' + data.orders.length + '건';
+        document.getElementById('count').textContent = '총 ' + orders.length + '건';
         document.getElementById('updated').textContent = '갱신: ' + new Date().toLocaleTimeString('ko-KR');
         status.textContent = '';
       } catch (e) {
-        status.textContent = '불러오기 실패 — 로컬 서버로 열었는지 확인하세요.';
+        status.textContent = '불러오기 실패 — python proxy_server.py로 열었는지 확인하세요.';
       }
+    }
+
+    function applyFilters(orders) {
+      var vendor = document.getElementById('vendor-filter').value;
+      var part = document.getElementById('part-filter').value.trim().toLowerCase();
+      return orders.filter(function (o) {
+        var vendorOk = vendor === '전체' || o.거래처 === vendor;
+        var partOk = !part || o.품번.toLowerCase().indexOf(part) >= 0;
+        return vendorOk && partOk;
+      });
+    }
+
+    function renderRows(orders) {
+      var tbody = document.getElementById('rows');
+      tbody.innerHTML = '';
+      if (orders.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="15" class="ctr" style="color:#9aa3ad;padding:18px">조건에 맞는 발주가 없습니다.</td></tr>';
+        return;
+      }
+      orders.forEach(function (o, i) {
+        var tr = document.createElement('tr');
+        tr.innerHTML =
+          '<td class="ctr">' + (i + 1) + '</td>' +
+          '<td>' + o.발주번호 + '</td>' +
+          '<td>' + o.거래처 + '</td>' +
+          '<td>' + o.품번 + '</td>' +
+          '<td>' + o.품명 + '</td>' +
+          '<td>' + o.규격 + '</td>' +
+          '<td class="ctr">' + o.재질 + '</td>' +
+          '<td class="ctr">' + o.단위 + '</td>' +
+          '<td class="num">' + won(o.발주수량) + '</td>' +
+          '<td class="num">' + won(o.단가) + '</td>' +
+          '<td class="num">' + won(o.금액) + '</td>' +
+          '<td class="ctr">' + o.창고 + '</td>' +
+          '<td class="ctr">' + o.납기 + '</td>' +
+          '<td class="ctr"><span class="status-pill s-' + o.상태 + '">' + o.상태 + '</span></td>' +
+          '<td class="ctr"><a class="btn-search" data-testid="delivery-link" style="padding:3px 10px;font-size:11px;text-decoration:none" href="./input.html?po=' + encodeURIComponent(o.발주번호) + '">납품입력</a></td>';
+        tbody.appendChild(tr);
+      });
     }
 
     document.getElementById('tb-search').addEventListener('click', load);

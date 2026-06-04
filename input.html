@@ -8,7 +8,7 @@
 </head>
 <body>
   <div id="file-warning" class="warn" hidden>
-    ⚠️ 이 페이지는 <b>로컬 서버</b>로 열어야 합니다. (Codex에 "이 폴더에서 로컬 서버 열어줘" 또는 <code>python -m http.server</code>)
+    ⚠️ 이 페이지는 <b>프록시 서버</b>로 열어야 합니다. (Codex에 "이 폴더에서 프록시 서버 열어줘" 또는 <code>python proxy_server.py</code>)
   </div>
 
   <div class="titlebar">
@@ -25,7 +25,7 @@
     <span class="tbtn">🆕 신규</span>
     <span class="tbtn">🔍 조회</span>
     <span class="sep"></span>
-    <button id="tb-save">💾 저장</button>
+    <button id="tb-save" data-testid="save-button">💾 저장</button>
     <span class="tbtn">🗑 행삭제</span>
     <span class="sep"></span>
     <span class="tbtn">🧾 거래명세서(구매)</span>
@@ -51,7 +51,7 @@
 
     <div class="notice">
       ※ 연습용 — 가상 데이터. 자동화는 <b>납품수량</b>을 채우고 <b>저장 직전에서 멈춥니다.</b>
-      (연습용이라 저장을 실제로 눌러봐도 안전합니다.)
+      선택 실습에서만 저장을 눌러 F12의 <code>api/deliveries</code> 요청을 확인합니다.
     </div>
 
     <div class="grid-wrap" style="margin-top:6px">
@@ -78,7 +78,8 @@
 
     (async function () {
       try {
-        var res = await fetch('./api/orders.json', { cache: 'no-store' });
+        var res = await fetch('./proxy/orders', { cache: 'no-store' });
+        if (!res.ok) throw new Error('proxy failed');
         var data = await res.json();
         var o = data.orders.find(function (x) { return x.발주번호 === po; }) || data.orders[0];
         current = o;
@@ -91,7 +92,7 @@
           '<td>' + o.규격 + '</td>' +
           '<td class="ctr">' + o.단위 + '</td>' +
           '<td class="num">' + won(o.발주수량) + '</td>' +
-          '<td class="ctr"><input id="qty" class="qty" type="number" min="0" placeholder="0"></td>' +
+          '<td class="ctr"><input id="qty" data-testid="delivery-qty" class="qty" type="number" min="0" placeholder="0"></td>' +
           '<td class="num">' + won(o.단가) + '</td>' +
           '<td class="num" id="lineAmt">0</td>' +
           '<td class="ctr">10.0%</td>' +
@@ -101,7 +102,7 @@
         document.getElementById('qty').addEventListener('input', recalc);
       } catch (e) {
         document.getElementById('rows').innerHTML =
-          '<tr><td colspan="12" class="ctr" style="color:#b91c1c;padding:18px">발주를 불러오지 못했습니다 — 로컬 서버로 열었는지 확인하세요.</td></tr>';
+          '<tr><td colspan="12" class="ctr" style="color:#b91c1c;padding:18px">발주를 불러오지 못했습니다 — python proxy_server.py로 열었는지 확인하세요.</td></tr>';
       }
     })();
 
@@ -116,14 +117,34 @@
       document.getElementById('sum3').textContent = won(amt + vat);
     }
 
-    document.getElementById('tb-save').addEventListener('click', function () {
+    document.getElementById('tb-save').addEventListener('click', async function () {
       var qtyEl = document.getElementById('qty');
       var saved = document.getElementById('saved');
       if (!qtyEl || !qtyEl.value) { saved.innerHTML = '<span style="color:#b91c1c">납품수량을 입력하세요.</span>'; return; }
-      // 연습용이라 저장을 눌러도 안전 — 메시지로 '저장 직전 멈춤' 원칙을 상기
-      saved.innerHTML =
-        '✅ 저장되었습니다 (연습용). 납품수량 <b>' + qtyEl.value + '</b>.<br>' +
-        '<span style="color:#6b7280;font-size:12.5px;">진짜 ERP에서는 자동화가 여기 \'저장\' 직전에서 <b>멈추고</b>, 사람이 확인 후 누릅니다.</span>';
+      if (!confirm('연습 ERP에서만 더미 저장 요청을 보냅니다. 진짜 ERP에서는 저장 직전에서 멈춥니다. 계속할까요?')) return;
+
+      try {
+        var payload = {
+          발주번호: current.발주번호,
+          거래처: current.거래처,
+          품번: current.품번,
+          납품수량: Number(qtyEl.value),
+          연습용: true
+        };
+        var res = await fetch('./api/deliveries', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        var data = await res.json();
+        if (!data.ok) throw new Error(data.error || 'save failed');
+
+        saved.innerHTML =
+          '✅ 연습용 저장 요청을 보냈습니다. F12 Network에서 <b>api/deliveries</b>의 Payload를 확인하세요.<br>' +
+          '<span style="color:#6b7280;font-size:12.5px;">진짜 ERP에서는 자동화가 여기 \'저장\' 직전에서 <b>멈추고</b>, 사람이 확인 후 누릅니다.</span>';
+      } catch (e) {
+        saved.innerHTML = '<span style="color:#b91c1c">저장 요청 실패 — python proxy_server.py로 열었는지 확인하세요.</span>';
+      }
     });
   </script>
 </body>
