@@ -44,6 +44,18 @@ F12 Network에 프록시 응답과 저장 요청이 보이려면 **프록시 서
 - `api/deliveries`는 POST 요청이므로 반드시 `fetch로 복사`해서 Payload를 확인합니다.
 - 저장 후에는 다시 `proxy/orders`를 조회해서 `납품수량`, `잔량`, `상태`가 바뀌었는지 확인합니다.
 
+## Playwright 기록모드로 자동 수집
+DevTools를 직접 열지 않아도 Playwright 기록모드 창에서 조작하면 UI 클릭과 Network 요청/응답을 JSONL로 저장할 수 있습니다.
+
+```powershell
+python tools/erp_network_recorder.py --url http://58.72.235.17:8100/
+```
+
+- 오른쪽 위에 `REC Playwright Network` 배지가 보이는 창에서만 조작합니다.
+- 로그인, 메뉴 이동, 조회 실행 후 로그 파일을 분석하면 어떤 동작이 어떤 `WebApi` 요청을 만들었는지 확인할 수 있습니다.
+- 로그와 브라우저 프로필은 `output/playwright/`에 생성되며 git에는 포함하지 않습니다.
+- 기본값은 로그인 HTML 같은 `document` 응답 본문을 저장하지 않고, XHR/fetch 본문만 저장합니다.
+
 ## 안전
 - 전부 가상 데이터라 선택 실습에서 **저장 요청까지 눌러봐도 안전**합니다. 실제 파일이나 데이터베이스에는 저장하지 않습니다.
 - 단, 블록 ④ **진짜 ERP**에서는 입력값을 테스트·더미로, **저장은 사람이 확인 후** 직접.
